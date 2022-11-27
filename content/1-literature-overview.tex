@@ -1,0 +1,32 @@
+\chapter{Overview of the Literature}
+
+In this chapter I am going to review the theoretical background for the two competing paradigms I cover: the fully convolutional, one-stage detector, whose most prominent variant is the You Only Look Once (YOLO) architecture, and the Transformer-based Detectection Transformer (DETR). For the former, I will explain in some detail chosing it over its competitors of the same kind, for example the Single Shot Detector (SSD).
+
+In the case of the Tranformer-based category, I chose, for the sake of simplicity, the DETR architecture over its later successors, like DINO or Deformable DETR. The changes introduced in \textbf{its paper (insert citation)} are important enough to be discussed on their own, but I will mention the improvements achieved by the successors whenever the state-of-the-art is concerned.
+
+Likewise, I have chosen the YOLOv5 for in-depth comparison as the DETR's counterpart, mainly because it is a contemporary of the latter (both being introduced in 2020), but mentioning the latest improvements introduced by YOLOv7 as well.
+
+\section{YOLO: You Only Look Once}
+\subsection{Implementation details}
+\section{DETR: The Detection Transformer}
+\subsection{The Transformer in Natural Language Processing}
+
+The Transformer architecture has been introduced in the \textit{Attention is All You Need}~\cite{Transformer} paper in 2017, originally intended for Natural Language Processing (NLP) tasks, more specifically sequence transduction problems, like translation.
+
+At the time, the attention mechanism and some variants of the encoder-decoder architecture was already widely used in the state-of-the-art, along with convolutional layers, Long Short Term Memory (LSTM) cells or Gated Recurrent Units (GRU). The Transformer was a successful attempt at replacing the latter three with trainable versions of the attention mechanisms called \textit{Multi-Head Attention}.
+
+In the Transformer model, the bulk of the learning happens at the weights of the linear transformations that estabilish the \textbf{heads} of the Attention layers, as the Attention layer itself does only mathematical operations on its input. 
+
+The article mentions that attention mechanisms and encoder-decoder based architectures have already been used at the time in the state-of-the art models. The novelty of the Transformer was getting rid of the convolutional, or traditionally recurrent components, and relying almost solely on the attention mechanism, namely a slightly modified version of it: the \textit{multi-head self-attention}.
+
+\subsubsection{Multi }
+
+\subsubsection{What is the difference between a neural layer and the attention?}
+
+\subsection{DETR}
+
+The main advantage of the Detection Transformer is its capacity for every region to attend to every other region. In the fully convolutional case, this is done with hierarchical convolutions that together define large \textit{receptive fields}.
+
+\subsection{Explainability}
+
+\section{Comparison}
