@@ -13,12 +13,37 @@ The problem builds on detection, but the difficulty also comes in assigning the 
 Proximity-based association fails in scenarios where multiple objects of the same kind are very close to each other and dynamically moving, while visible features can vary because of the lighting condintions, orientation, occlusion or the object's own changes in appearance. Due to these problems, multiple object tracking is still a challenging task.
 For a comprehensive, recent overview of the problem, see the literature review at~\cite{Luo_2021}.
 
+The most common multi-object tracking targets are pedestrians, faces and vehicles. 
+
 In this thesis, I am going to tackle tracking vehicles in road traffic footages.
 
 \section{Metrics}
 
-The MOT challenge~\footnote{\url{https://motchallenge.net/}} is one of the most popular multiple object tracking  benchmarks used currently. Its most recent version is the MOT20 benchmark, introduced in   
+The MOT challenge~\footnote{\url{https://motchallenge.net/}} is one of the most popular currently used multiple object tracking benchmarks. Its most recent version is the MOT20 benchmark.
 
 \section{Solutions}
 
 Most of the leading, publicly-disclosed multiple object tracking methods are detection-based, and thus are not end-to-end, as the system is not trained in one go, but for subtasks and then assembled later.
+
+\section{My measurement}
+\subsection{Data}
+
+I will evaluate the model's performance for multi-object tracking on the UA-DETRAC dataset\footnote{\url{https://detrac-db.rit.albany.edu/}}. The dataset contains 100 videos (60 for training, 40 for testing) of road traffic captured at different locations in China. The total length of the video footage is around 10 hours, stored frame by frame (as 960 pixel by 540 pixel images), at the rate of 25 frames per second.
+
+The annotations contain information about vehicle type, illumination, scale (proportional to the square root of the bounding box area), occlusion ratio (the measure by which other objects occlude the vehicle) and truncation ratio (the degree of the bounding box lying outside the frame). 
+
+\subsection{Benchmark}
+
+The dataset and the benchmark is described in~\cite{CVIU_UA-DETRAC}. The article also proposes an evaluation protocol for multi-object tracking. A key point is the joint analysis of detection and tracking performance, analysing the effects of the chosen model's precision/recall values (and the underlying confidence threshold setting that influences both) in relation with the tracking performance, as reflected by the MOTA and MOTP score. These relationships are visualized on the PR-MOTA and PR-MOTP curves \textbf{TODO: visualization}.
+
+The authors argue that, as it is not fair, nor enough to compare the performance of two object detectors based on different points on the PR curve, it is also not enough to determine the maximum point on the PR-MOTA curve, as a good tracker must produce good scores in a wider range of settings. The whole range of the curve must be taken into account in some form, thus the need for a new metric:
+
+\[ \Omega^{*} = \frac{1}{2}\int_{\mathcal{C}} \Psi(p, r) \,d\textbf{s} \]
+
+where $\Psi$ is the MOTA score across the whole dataset at precision $p$ and recall $r$, and we calculate the (approximate value) of the area under the PR-MOTA curve as an integral along the PR curve $\mathcal{C}$ (for every $(p, r) \in \mathcal{C}$). Similar metrics can be defined for the MOTP, FP, FN, IDS, MT and ML scores.
+
+\textbf{TODO: explain MOTA, MOTP, FP, FN, IDS, MT, ML}.
+
+Usually, a baseline for detection performance in MOT is the R-CNN architecture and its variants.
+
+For the MOT task, I have chosen the SORT architecture, introduced in~\cite{Bewley_2016}. Altough not the most recent, it is the architecture I have examined in my project laboratory, and has the analytical advantage of solely relying on detection performance, as opposed to method like DeepSORT that are influenced by the association method as well. It can be considered a reasonable baseline methood, relying on first-order velocity estimation and smoothing measurement errors based on the Kalman Filter.  
