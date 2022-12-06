@@ -4,18 +4,21 @@ As the final aim of my thesis, I am going to inspect the performance of the chos
 
 After this, I will elaborate on the object tracking method I chose as the basis, showing how it incorporates the aforementioned detectors, and the way the performance of the latter is expected to influence tracking performance.
 
-\section{The Problem}
+\section{The problem and possible approaches}
 
-Multiple object tracking consists of determining the \textit{trajectory} of given kinds of objects in a video stream. In the current context, the trajectory of a single, unique instance is a series of bounding boxes, one for every frame in which the object is visible. The boxes are expected to fit the object as tightly as possible, and the trajectories have usually some kind of identity associated with them. 
+Multiple object tracking (MOT) consists of determining the \textit{trajectory} of given kinds of objects in a video stream. In the current context, the trajectory of a single, unique object is a series of bounding boxes with an identifier, one box for every frame in which the object is visible. The rectangular bounding boxes are expected to fit the object shilouette as tightly as possible.
 
-The problem builds on detection, but the difficulty also comes in assigning the current detected objects a correct identity, if it has been seen previously, or a new one otherwise. This action is generally called \textit{association}. There are usually two, not necessarily exclusive approaches: association between detections in subsequent frames (the identified objects in the previous frames are expected to be close to their current location, thus associating by proximity), or overarching association by some appearance features (association by feature similarity).
+Along the years, several approaches have been developed for the problem, but with the advent of highly accurate object detectors (most notably the breakthrough of convolutional neural networks from the mid-2010s and onward), the detection-based paradigm has become one of the most popular.
 
-Proximity-based association fails in scenarios where multiple objects of the same kind are very close to each other and dynamically moving, while visible features can vary because of the lighting condintions, orientation, occlusion or the object's own changes in appearance. Due to these problems, multiple object tracking is still a challenging task.
-For a comprehensive, recent overview of the problem, see the literature review at~\cite{Luo_2021}.
+The approach consists of detecting objects on each new frame, then assigning them to previously found trajectories, if the object has been seen before, or registering a new trajectory otherwise. This is generally called the \textit{association step}. In some scenarios, when the objects of interest are densely packed, this can pose a considerable difficulty.
 
-The most common multi-object tracking targets are pedestrians, faces and vehicles. 
+Among some popular solutions to this association problem are the \textit{proximity-based} (the Simple Online and Realtime Tracking (SORT) architecture~\cite{Bewley_2016} is one example) and the \textit{feature-based} (the DeepSORT architecture \cite{DeepSORT} incorporates such methods using \textit{deep appearance descriptors}) assignments. The former considers each already existent trajectory, takes their previous location, or the predicted location for this time step, and does the assignment based on some spatial distance between these and current detections. The latter does overarching associations based on visual appearance features, not necessarily restricted to the appearance observed in the last few frames.
 
-In this thesis, I am going to tackle tracking vehicles in road traffic footages.
+The weakness of the proximity-based approach is when the density of objects is high, their movement highly dynamic and their trajectories intertwined. In this case, feature-based methods might excel. The weakness of the feature-based methods might show when they confuse similar, but distinct objects, or when they cannot account for some drastic, fast changes in appearance (like changes in lighting, orientation, deforming, or partial occlusion). In these situations, assignment to last known locations can help. Thus, these two approaches are not, and should not be exclusive.
+
+The introduction above focuses on paradigms and aspects mostly relevant for my thesis, and narrows down the field somewhat. For a comprehensive, recent overview of the problem, see the literature review at~\cite{Luo_2021}. It goes beyond just the detection-based approach, and also formalises the general problem.
+
+Finally, it is worth mentioning that the most common multi-object tracking targets are pedestrians, faces and vehicles, and thus most popular MOT datasets consist of these. In this thesis, I am going to tackle tracking vehicles in road traffic footages.
 
 \section{Metrics}
 
