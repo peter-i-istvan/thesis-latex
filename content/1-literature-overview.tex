@@ -6,10 +6,13 @@ In the case of the Tranformer-based category, I chose, for the sake of simplicit
 
 Likewise, I have chosen the YOLOv5 for in-depth comparison as the DETR's counterpart, mainly because it is a contemporary of the latter (both being introduced in 2020), but mentioning the latest improvements introduced by YOLOv7 as well.
 
-\section{YOLO: You Only Look Once}
-\subsection{Implementation details}
-\section{DETR: The Detection Transformer}
-\subsection{The Transformer in Natural Language Processing}
+\section{Metrics in object detection}
+\section{Fully Convolutional Architectures}
+\subsection{Two-stage detectors}
+\subsection{One-Stage detectors}
+\subsubsection{The YOLO architecture}
+\section{Transformer based approached}
+\subsection{The Transformer}
 
 The Transformer architecture has been introduced in the \textit{Attention is All You Need}~\cite{Transformer} paper in 2017, originally intended for Natural Language Processing (NLP) tasks, more specifically sequence transduction problems, like translation.
 
@@ -19,11 +22,8 @@ In the Transformer model, the bulk of the learning happens at the weights of the
 
 The article mentions that attention mechanisms and encoder-decoder based architectures have already been used at the time in the state-of-the art models. The novelty of the Transformer was getting rid of the convolutional, or traditionally recurrent components, and relying almost solely on the attention mechanism, namely a slightly modified version of it: the \textit{multi-head self-attention}.
 
-\subsubsection{Multi }
-
-\subsubsection{What is the difference between a neural layer and the attention?}
-
-\subsection{DETR}
+\subsection{Visual Transformers}
+\subsubsection{The Detection Transformer}
 
 The main advantage of the Detection Transformer is its capacity for every region to attend to every other region. In the fully convolutional case, this is done with hierarchical convolutions that together define large \textit{receptive fields}.
 

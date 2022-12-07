@@ -20,45 +20,25 @@ The introduction above focuses on paradigms and aspects mostly relevant for my t
 
 Finally, it is worth mentioning that the most common multi-object tracking targets are pedestrians, faces and vehicles, and thus most popular MOT datasets consist of these. In this thesis, I am going to tackle tracking vehicles in road traffic footages.
 
-\section{Metrics}
+\section{Metrics [WORK IN PROGRESS]}
 
-The MOT challenge~\footnote{\url{https://motchallenge.net/}} is one of the most popular currently used multiple object tracking benchmarks. Its most recent version is the MOT20 benchmark.
+When it comes to define metrics to measure a tracking solution's performance, there does not seem to be one trivial, immediately obvious score that can quantify the overall adequacy. When chosing metrics, I had to look for what the most well-known and respected benchmarks measured.
 
-\section{SORT}
+One of, if not the most popular multiple object tracking benchmark is the MOTChallenge\footnote{\url{https://motchallenge.net/}}, introduced in~\cite{MOT15}.
 
-\textbf{TODO: explain SORT}
+TODO: The MOT15 data format.
 
-\section{My measurement}
-\subsection{Data}
+\section{SORT, theoretical background [WORK IN PROGRESS]}
+
+
+\section{Choosing the data}
 
 I will evaluate the model's performance for multi-object tracking on the UA-DETRAC dataset\footnote{\url{https://detrac-db.rit.albany.edu/}}. The dataset contains 100 videos (60 for training, 40 for testing) of road traffic captured at different locations in China. The total length of the video footage is around 10 hours, stored frame by frame (as separate 960 pixel by 540 pixel JPEG images), at the rate of 25 frames per second.
 
 The annotations contain information about vehicle type, illumination, scale (proportional to the square root of the bounding box area), occlusion ratio (the measure by which other objects occlude the vehicle) and truncation ratio (the degree of the bounding box lying outside the frame). Information about weather conditions e.g.~rainy, cloudy, sunny etc.~is also included.
 
-\subsection{Benchmark}
 
-The dataset and the benchmark is described in~\cite{CVIU_UA-DETRAC}. The article also proposes an evaluation protocol for multi-object tracking. A key point is the joint analysis of detection and tracking performance, analysing the effects of the chosen model's precision/recall values (and the underlying confidence threshold setting that influences both) in relation with the tracking performance, as reflected by the MOTA and MOTP score. These relationships are visualized on the PR-MOTA and PR-MOTP curves (See figure \ref{fig:pr-mota}).
-
-\begin{figure}[h]
-    \captionsetup{width=\textwidth}
-    \includegraphics[width=\textwidth]{figures/pr-mota-curve.png}
-    \caption{Visualization of the PR-MOTA curve. Image taken from \cite{CVIU_UA-DETRAC}}
-    \label{fig:pr-mota}
-\end{figure}
-
-The authors argue that, as it is not fair, nor enough to compare the performance of two object detectors based on different points on the PR curve, it is also not enough to determine the maximum point on the PR-MOTA curve, as a good tracker must produce good scores in a wider range of settings. The whole range of the curve must be taken into account in some form, thus the need for a new metric, $\Omega^{*}$, or the \textit{PR-MOTA score}:
-
-\[ \Omega^{*} = \frac{1}{2}\int_{\mathcal{C}} \Psi(p, r) \,d\textbf{s} \]
-
-where $\Psi$ is the MOTA score across the whole dataset at precision $p$ and recall $r$, and we calculate the (approximate value of the) signed area under the PR-MOTA curve as an integral along the PR curve $\mathcal{C}$ (for every $(p, r) \in \mathcal{C}$). Dividing by 2 ensures that the score stays in the interval $(-\infty, 100\%]$. Similar metrics can be defined for the MOTP, FP, FN, IDS, MT and ML scores.
-
-\textbf{TODO: explain MOTA, MOTP, FP, FN, IDS, MT, ML}.
-
-\subsection{Evaluation}
-
-The tracking evaluation toolkit on the official DETRAC website is not available\footnote{\url{https://detrac-db.rit.albany.edu/Tracking}, under DETRAC-toolkit (Windows beta)}, because the login feature does not work. Thus, I had to write my own implementation for the evaluation based on the CLEAR MOT metrics~\cite{Bernardin2008}.
-
-\subsection{Data Exploration}
+\section{Data Exploration}
 
 At the time of writing this thesis, the test and train images, grouped into sequences that form videos, can be accessed through the Download page of the official site\footnote{\url{https://detrac-db.rit.albany.edu/download}} as \verb|DETRAC-train-data.zip|. However, the tracking annotations for the train and test sets cannot be downloaded, as clicking on the links triggers a popup prompting to log in first. As the login functionality currently does not work, I had to look for alternative ways to access the data.  
 
@@ -89,10 +69,97 @@ Initially I inspected the MAT files' inner structure (see figure~\ref{fig:octave
     \end{center}
 \end{figure}
 
-\subsection{Data Processing}
 
-...
+\section{Benchmark}
 
+The dataset and the benchmark is described in~\cite{CVIU_UA-DETRAC}. The article also proposes an evaluation protocol for multi-object tracking. A key point is the joint analysis of detection and tracking performance, analysing the effects of the chosen model's precision/recall values (and the underlying confidence threshold setting that influences both) in relation with the tracking performance, as reflected by the MOTA and MOTP score. These relationships are visualized on the PR-MOTA and PR-MOTP curves (See figure~\ref{fig:pr-mota}).
+
+\begin{figure}[h]
+    \captionsetup{width=\textwidth}
+    \includegraphics[width=\textwidth]{figures/pr-mota-curve.png}
+    \caption{Visualization of the PR-MOTA curve. Image taken from \cite{CVIU_UA-DETRAC}}
+    \label{fig:pr-mota}
+\end{figure}
+
+The authors argue that, as it is not fair, nor enough to compare the performance of two object detectors based on different points on the PR curve, it is also not enough to determine the maximum point on the PR-MOTA curve, as a good tracker must produce good scores in a wider range of settings. The whole range of the curve must be taken into account in some form, thus the need for a new metric, $\Omega^{*}$, or the \textit{PR-MOTA score}:
+
+\[ \Omega^{*} = \frac{1}{2}\int_{\mathcal{C}} \Psi(p, r) \,d\textbf{s} \]
+
+where $\Psi$ is the MOTA score across the whole dataset at precision $p$ and recall $r$, and we calculate the (approximate value of the) signed area under the PR-MOTA curve as an integral along the PR curve $\mathcal{C}$ (for every $(p, r) \in \mathcal{C}$). Dividing by 2 ensures that the score stays in the interval $(-\infty, 100\%]$. Similar metrics can be defined for the MOTP, FP, FN, IDS, MT and ML scores.
+
+\section{Designing the measurement}
+
+For the measurment, I chose 7 detectors in total: two DETR variants, one with the ResNet50 and one with the ResNet101 backbone, pre-trained on the COCO 2017 dataset. The other 5 were the YOLOv5n (nano), YOLOv5s (small), YOLOv5m (medium), YOLOv5l (large), YOLOv5x (extra large). These differ in the size, as in number of parameters, and this influences the inference times as well.
+
+Each detector was evaluated at 10 confidence thresholds: from 0.0 to 0.9, incremented by 0.1.
+
+To calculate the value defined by the UA-DETRAC benchmark, I had to break the process into multiple steps and assess the best tool for each subtask.
+
+As input data, I had the UA-DETRAC training videos, as frame sequences, and the annotations in MATLAB format.
+
+For my tracker of choice, I could clone the public GitHub repository\footnote{\url{https://github.com/abewley/sort}}, and run the tracker, provided I put the detections in MOT2015 format for each sequence under the \verb|data| folder.
+
+The rest of the steps had to be implemented by me. First, I had to create a model executor that returned the detections from each frame of the video sequences, and served as a adapter-wrapper around both the DETR and the YOLOv5 models, to hide the differences in preprocessing. Running this on all combinations of models, confidence thresholds and sequences. For each unique trio of these, one file has been saved in the MOT15 detection format.
+
+The detections themselves, along with the annotations were enough to calculate the precision-recall curve for each model, aggregating the values for all sequences.
+
+Next, I ran the SORT script provided in the official repository for each model separately, on every sequence and confidence threshold combination. These were automatically saved in the MOT15 tracking annotation format.
+
+Having the tracking output and the ground truth annotations, I ran the tracking evaluation on every model and confidence threshold combination, aggregating MOTA values for all sequences.
+
+Given both the precision-recall curves for every model as a function of the confidence threshold, and the MOTA values for every model and confidence threshold combination, I could finally calculate the PR-MOTA scores for each model.
+
+A visual overview of the process above can be seen in figure~\ref{fig:workflow}. Detailing of the individual design choices made at each step can be found in the following subsections. At some of the steps, I implemented visualizations as a way to spot possible errors in implementation that could compromise the whole measurement. 
+
+The language I used was Python 3.10, the inference times were recorded under Linux, on a desktop PC with an AMD Ryzen 3800X processor, 32 Gigabytes of RAM and an RTX3060Ti graphics card with 8 Gigabytes of VRAM. 
+
+\begin{figure}[h]
+    \captionsetup{width=\textwidth}
+    \includegraphics[width=\textwidth]{figures/workflow.pdf}
+    \caption{Flowchart visualization of my workflow. The blue rectangles denote data, rounded rectangles denote processing steps. Blue outline means that part of the workflow was implemented by me, or the data was generated in the process. No blue outline means either the data is from an external source, or the processing step involved using entirely external code.}
+    \label{fig:workflow}
+\end{figure}
+
+\subsection{Running the detections}
+
+Before running detections.
+
+\subsection{Calculating precision and recall}
+
+\subsection{Running SORT}
+
+\subsection{Calculating tracking performance}
+
+\subsection{Calculting benchmark scores}
+
+\section{Conclusion}
+
+% \subsection{Evaluation}
+
+% The tracking evaluation toolkit on the official DETRAC website is not available\footnote{\url{https://detrac-db.rit.albany.edu/Tracking}, under DETRAC-toolkit (Windows beta)}, because the login feature does not work. Thus, I had to write my own implementation for the evaluation based on the CLEAR MOT metrics~\cite{Bernardin2008}.
+
+
+
+% \subsection{Running the detections}
+
+% For the detectors, I have chosen the Detection Transformer (DETR) model as a representative Transformer-based architecture, with two variants, containing the ResNet50 and the ResNet101 backbones, pre-trained on the COCO 2017 dataset.
+
+% On the Fully Convolutional Network (FCN) side, I have chosen a rendition of the You Only Look Once (YOLO) architecture that came out at roughly the same time as the DETR: the YOLOv5. The official repository of the YOLOv5 project\footnote{\url{https://github.com/ultralytics/yolov5}} contains five pre-trained variants: the YOLOv5n (nano), YOLOv5s (small), YOLOv5m (medium), YOLOv5l (large) and YOLOv5x (extra large), all being trained on the COCO 2017 dataset.
+
+% Before running the SORT tracker, I had to prepare the detection results for all sequences in a specific format.
+
+
+
+% \subsection{Running the tracker}
+
+% \begin{figure}[h]
+    % \captionsetup{width=\textwidth}
+    % \includegraphics[width=\textwidth]{}
+    % \caption{...}
+    % \label{fig:dunno}
+% \end{figure}
+
+% \subsection{Tracking visualisation}
 
 
 % \subsection{Rest}
