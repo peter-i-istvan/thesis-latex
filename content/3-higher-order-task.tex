@@ -99,15 +99,15 @@ As input data, I had the UA-DETRAC training videos, as frame sequences, and the 
 
 For my tracker of choice, I could clone the public GitHub repository\footnote{\url{https://github.com/abewley/sort}}, and run the tracker, provided I put the detections in MOT2015 format for each sequence under the \verb|data| folder.
 
-The rest of the steps had to be implemented by me. First, I had to create a model executor that returned the detections from each frame of the video sequences, and served as a adapter-wrapper around both the DETR and the YOLOv5 models, to hide the differences in preprocessing. Running this on all combinations of models, confidence thresholds and sequences. For each unique trio of these, one file has been saved in the MOT15 detection format.
+The rest of the steps had to be implemented by me. First, I had to create a model executor that returned the detections from each frame of the video sequences, and served as a adapter-wrapper around both the DETR and the YOLOv5 models, to hide the differences in preprocessing. I invoked this this on all combinations of models, confidence thresholds and sequences. For each unique trio of these, one file has been saved in the MOT15 detection format.
 
-The detections themselves, along with the annotations were enough to calculate the precision-recall curve for each model, aggregating the values for all sequences.
+The detections themselves, along with the annotations were enough to calculate the precision-recall curve for each model, aggregating the values for all sequences. For evaluation I used the standard IoU metric for ground truth-prediction distance, with IoU threshold 0.7 (In the code, \verb|max_iou| is set to 0.3, because the library I used considers $1-IoU$ when matching ground truth with prediction. More on that in the relevant subsection). This is not to be confused with the confidence threshold, which is a property of the detector that can be set, and varies. This is a global setting which means that a good prediction can be considered a match to the ground truth box only if their IoU distance is at least 0.7, a reasonable expectation according to my visual intuition.
 
 Next, I ran the SORT script provided in the official repository for each model separately, on every sequence and confidence threshold combination. These were automatically saved in the MOT15 tracking annotation format.
 
-Having the tracking output and the ground truth annotations, I ran the tracking evaluation on every model and confidence threshold combination, aggregating MOTA values for all sequences.
+Having the tracking output and the ground truth annotations, I ran the tracking evaluation on every model and confidence threshold combination, aggregating MOTA values for all sequences. The evaluation IoU threshold was set to 0.7, like at the detection evaluation.
 
-Given both the precision-recall curves for every model as a function of the confidence threshold, and the MOTA values for every model and confidence threshold combination, I could finally calculate the PR-MOTA scores for each model.
+Given both the precision-recall curves for every model (where both precision and recall are a function of the confidence threshold), and the MOTA values for every model and confidence threshold combination, I could finally calculate the PR-MOTA scores for each model.
 
 A visual overview of the process above can be seen in figure~\ref{fig:workflow}. Detailing of the individual design choices made at each step can be found in the following subsections. At some of the steps, I implemented visualizations as a way to spot possible errors in implementation that could compromise the whole measurement. 
 
@@ -122,11 +122,160 @@ The language I used was Python 3.10, the inference times were recorded under Lin
 
 \subsection{Running the detections}
 
-Before running detections.
+In order to evaluate the aforementioned models on images, I had to find the easiest way to load the pretrained weights for each model.
+
+For the DETR, the \verb|transformers| Python package by Huggingface\footnote{\url{https://huggingface.co/docs/transformers/index}} provides the easiest API, with simple pre- and postprocessing (including confidence thresholding and converting from logits to probability distributions), and also provides a way to download pretrained weights. Under the hood, \verb|transformers| uses a PyTorch \verb|torch.nn.Module|, so sending it to the GPU is similar to all Torch modules. Also theoretically loading from Torch Hub was also a possibility, but the pre- and postprocessing tasks would have been messier.
+
+As for the YOLOv5 model, it can be loaded directly from Torch Hub, and its input format is way more flexible, so lists of images (for the inference, I used batches of size 1), but even image links can  be fed to it directly.
+
+To hide the differences between these two approaches, I implemented an adapter class for them, and also added visualization capabilities to spot possible errors in the interpretation of data (for example, assuming wrong bounding box format).
+
+I also wanted to meausre average inference times to show a picture about the real time capabilities of each detector. All inference happened on the GPU, so due to the asynchronous nature of the Torch CUDA operations, measuring elapsed time on CPU was out of the question. The appropriate time measuring method, as suggested on the official Torch forums\footnote{\url{https://discuss.pytorch.org/t/how-to-measure-time-in-pytorch/26964}} was through the \verb|torch.cuda.Event| object. I took the elapsed GPU time between the moment of feeding the inputs until recieving the logits, but this didn't include copy times between the RAM and VRAM, neither the postprocessing steps (calculating probability distributions with softmax, confidence thresholding).
+
+Timing results can be seen in table~\ref{tab:inference-times}. All code to reproduce the results can be found on the GitHub repository of my thesis\footnote{
+    See \url{https://github.com/peter-i-istvan/bsc-thesis}, under \texttt{tracking/run\_detection.py}.
+}.
+
+\begin{table}[h]
+    \begin{tabular}{|c|c|c|c|c|c|c|c|}
+        \hline
+         & yolov5n & yolov5s & yolov5m & yolov5l & yolov5x & detr-resnet-50 & detr-resnet-101 \\
+        \hline
+        \hline
+        avg (ms) & 7.38 & 7.38 & 8.99 & 12.00 & 20.88 & 43.98 & 64.53 \\
+        \hline
+        std (ms) & 1.16 & 0.24 & 0.24 & 0.18 & 0.27 & 0.80 & 0.66 \\
+        \hline
+        \hline
+            FPS & 135.5 & 135.5 & 111.2 & 83.3 & 47.89 & 22.73 & 15.49 \\
+        \hline
+    \end{tabular}
+    \caption{Average inference times on GPU and their standard deviation (expressed in miliseconds) for each model, after running on every sequence.}
+    \label{tab:inference-times}
+\end{table}
+
+\begin{figure}[h]
+    
+\end{figure}
 
 \subsection{Calculating precision and recall}
 
+Next, I had to calculate precision and recall curves for the detections. To do this, for every model and confidence threshold pair, I had to sum all true positives, false positives and false negatives in every sequence. For the theoretical definition of these, not only in the general meaning, but in the case of object detection, where assignment between ground truth and predicted boxes is not always trivial (the Hungarian bipartite graph matching algorithm solves this ambiguity), see chapter one.
+
+For the concrete implementation, I took a `sideways' approach, but one that could be mostly reused later in calculating the MOTA score as well. The \verb|motmetrics| Python package\footnote{\url{https://pypi.org/project/motmetrics/}} provides handy tools for calculating MOT metrics, like those in CLEAR MOT. Specificaly, it gives us an \textit{accumulator} object that must be initialized before evaluating on a seqence, then for each frame, its \verb|update()| function must be called to update its state. In the arguments, one must provide ground truth IDs and predicted IDs, as well as a distance matrix that expresses the distance between ground truth box \textit{i} and prediction box \textit{j}. In theory, \verb|motmetrics| is distance-agnostic, which means that any kind of distance can be supplied, but I used the IoU box distance metric, which is one of the most popular evaluation metrics both for object detection and multiple object tracking. \verb|motmetrics| provides functions for calculating all popular metrics, so incorporating IoU calculation into my code was easy.
+
+In its update step, the accumulator takes the input arguments, and in the first parts, it is not at all concerned with the IDs provided, but calculates the best ground truth box-to-prediction assignment with the Hungarian algorithm. This is the very exact action that is needed at detection evaluation as well, this is why we `piggy-backed' tracking evaluation. Based on this assignment, it generates \verb|MATCH|, \verb|MISS| and \verb|FP| events, which correspond to true positives, false negatives and false positives respectively.
+
+In the next steps, if we provided valid prediction IDs (a.k.a our hypotheses for the identities of the tracked objects), the accumulator would also record possible mistakes with regard to identity confusion, like identity swaps. However, considering that the MOTChallenge format defines -1 as the ID field when saving only detections, not tracking results, technically we tell the accumulator that all found boxes correspond to our object -1, which makes the rest of this step absolute rubbish, but it does not influence the events already recorded in the first step, and in the first steps of all future update calls.
+
+After finishing a sequence, the script extracts the number of relevant events, and adds them to all the previously calculated occurrences of true positives, false negatives and false positives for that model-confidence threshold pair. At the end of this, we will have a mapping counting all of these for every sequence. Then I iterate through all model-confidence threshold pairs, calculate the precision and recall values given by the formulas:
+\[P = \frac{TP}{TP + FP}\]
+\[R = \frac{TP}{TP + FN}\]
+
+Finally, I save them as CSV files. The result can be seen in tables~\ref{tab:p_curve} and~\ref{tab:r_curve}.
+
+\begin{table}
+    \begin{centering}
+    \begin{tabular}{|c||c|c|c|c|c|c|c|}
+        \hline
+        CT & D101 & D50 & YL & YM & YN & YS & YX \\
+        \hline
+        \hline
+        0.9 & 0.52 & 0.47 & 0.93 & 1.0 & 1.0 & 0.90 & 0.64 \\
+        \hline
+        0.8 & 0.45 & 0.41 & 0.54 & 0.61 & 0.83 & 0.61 & 0.49 \\
+        \hline
+        0.7 & 0.40 & 0.37 & 0.54 & 0.51 & 0.68 & 0.52 & 0.46 \\
+        \hline
+        0.6 & 0.36 & 0.33 & 0.51 & 0.46 & 0.53 & 0.45 & 0.44 \\
+        \hline
+        0.5 & 0.33 & 0.30 & 0.46 & 0.42 & 0.42 & 0.39 & 0.41 \\
+        \hline
+        0.4 & 0.30 & 0.28 & 0.40 & 0.37 & 0.34 & 0.32 & 0.36 \\
+        \hline
+        0.3 & 0.28 & 0.26 & 0.33 & 0.31 & 0.28 & 0.27 & 0.30 \\
+        \hline
+        0.2 & 0.25 & 0.23 & 0.30 & 0.28 & 0.25 & 0.24 & 0.27 \\
+        \hline
+        0.1 & 0.21 & 0.21 & 0.30 & 0.28 & 0.25 & 0.24 & 0.27 \\
+        \hline
+        0.0 & 0.19 & 0.18 & 0.30 & 0.28 & 0.25 & 0.24 & 0.27 \\
+        \hline
+    \end{tabular}
+    \caption{The precision curve of the models. CT is confidence threshold, D101 and D50 is DETR-Resnet 101 and 50, while YL, YM, YN etc. are the yolo versions.}
+    \label{tab:p_curve}
+    \end{centering}
+\end{table}
+
+\begin{table}
+    \begin{centering}
+    \begin{tabular}{|c||c|c|c|c|c|c|c|}
+        \hline
+        CT & D101 & D50 & YL & YM & YN & YS & YX \\
+        \hline
+        \hline
+        0.9 & 0.63 & 0.57 & 0.03 & 0.01 & 0.00 & 0.02 & 0.12 \\
+        \hline 
+        0.8 & 0.69 & 0.65 & 0.41 & 0.34 & 0.13 & 0.36 & 0.46 \\
+        \hline 
+        0.7 & 0.71 & 0.68 & 0.59 & 0.52 & 0.41 & 0.56 & 0.60 \\
+        \hline 
+        0.6 & 0.73 & 0.69 & 0.69 & 0.63 & 0.52 & 0.66 & 0.69 \\
+        \hline 
+        0.5 & 0.73 & 0.71 & 0.76 & 0.72 & 0.60 & 0.72 & 0.76 \\
+        \hline 
+        0.4 & 0.74 & 0.71 & 0.81 & 0.79 & 0.66 & 0.77 & 0.81 \\
+        \hline 
+        0.3 & 0.75 & 0.72 & 0.84 & 0.84 & 0.70 & 0.80 & 0.84 \\
+        \hline 
+        0.2 & 0.75 & 0.72 & 0.86 & 0.86 & 0.72 & 0.81 & 0.86 \\
+        \hline 
+        0.1 & 0.76 & 0.73 & 0.86 & 0.86 & 0.72 & 0.81 & 0.86 \\
+        \hline 
+        0.0 & 0.76 & 0.73 & 0.86 & 0.86 & 0.72 & 0.81 & 0.86 \\
+        \hline
+    \end{tabular}
+    \caption{The recall curve of the models. CT is confidence threshold, D101 and D50 is DETR-Resnet 101 and 50, while YL, YM, YN etc. are the yolo versions.}
+    \label{tab:r_curve}
+    \end{centering}
+\end{table}
+
+Running this took 1 hour and 8 minutes on my machine. For implementation, see my GitHub repository\footnote{See \url{https://github.com/peter-i-istvan/bsc-thesis}, under \texttt{tracking/detection\_evaluation.py} for the code, \texttt{p\_curve.csv}, and \texttt{r\_curve.csv} for the curves in }, where the curves are also available, saved in CSV format. 
+
+\textbf{insert plots when ready}
+
 \subsection{Running SORT}
+
+I ran SORT by cloning its repository, applying a small patch to account for divison by 0 at empty detection files (happened with YOLOv5n models for some sequences, at high confidence thresholds), installing the dependencies and issuing the following command:
+\begin{verbatim}
+    python sort.py --seq_path DETECTIONS_ROOT --phase MODEL --max_age 3
+\end{verbatim}
+
+The main hyperparameters of SORT are \verb|min_hits|, \verb|max_age| and \verb|iou_threshold|, all of them can be supplied to the script by command line parameters.
+
+Minimum hits means the minimum number of consecutive times a new trajectory must be confirmed (by detection `hits' that get assigned to it) to consider it a real one. Its default value is 3, and I left it at that.
+
+Maximum age is the longest consecutive time that a trajectory without detection (if the detector somehow lost the object) can be kept alive. The position predictions are still updated, so the tracker looks for the object a little bit further apart at each frame, in the direction and considering the magnitude of the last known velocity. The default value is 1, but I set it to 3 because it seemed reasonable (based on my experiences in the Project Laboratory course, where similar maximum ages lead to better results).
+
+IoU threshold is the minimum IoU value between the hypothesized current bounding box location of the object (predicted by the Kalman filter) and any detection bounding box that can be matched with it. The default value is 0.3, and I left it at that.
+
+During the consecutive runnings of the script, I recorded the elapsed time and FPS reported by the script for each model. The results are confirming the belief that SORT is a very fast tracker, with the main factor for the tracking framerate in a real time scenario (where detections are not precomputed) being the detection time (almost two orders of magnitude higher than the tracking time at each frame). For the results, see table~\ref{tab:sort-times}.
+
+\begin{table}[h]
+    \begin{tabular}{|c|c|c|c|c|c|c|c|}
+        \hline
+         & yolov5n & yolov5s & yolov5m & yolov5l & yolov5x & detr-resnet-50 & detr-resnet-101 \\
+        \hline
+        \hline
+        Time (s) & 1313.99 & 1155.18 & 482.8 & 599.88 & 611.18 & 654.18 & 668.11\\
+        \hline
+        \hline
+        FPS  & 637 & 725 & 1710.2 & 1391.7 & 1369.1 & 1279.1 & 1253.5 \\
+        \hline
+    \end{tabular}
+    \caption{Statistics reported by the SORT script. The evaluation was done on 60 videos and on 10 confidence thresholds, making a total of 600 detection inputs. The time is the total evaluation time for all 600 inputs. The numbers are aggregated over confidence thresholds, but on lower values, tracking tends to take more time, as the consistent erroneus detections form a high number of false tracks.}
+    \label{tab:sort-times}
+\end{table}
 
 \subsection{Calculating tracking performance}
 
