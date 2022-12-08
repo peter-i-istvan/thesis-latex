@@ -154,10 +154,6 @@ Timing results can be seen in table~\ref{tab:inference-times}. All code to repro
     \label{tab:inference-times}
 \end{table}
 
-\begin{figure}[h]
-    
-\end{figure}
-
 \subsection{Calculating precision and recall}
 
 Next, I had to calculate precision and recall curves for the detections. To do this, for every model and confidence threshold pair, I had to sum all true positives, false positives and false negatives in every sequence. For the theoretical definition of these, not only in the general meaning, but in the case of object detection, where assignment between ground truth and predicted boxes is not always trivial (the Hungarian bipartite graph matching algorithm solves this ambiguity), see chapter one.
@@ -240,9 +236,28 @@ Finally, I save them as CSV files. The result can be seen in tables~\ref{tab:p_c
     \end{centering}
 \end{table}
 
-Running this took 1 hour and 8 minutes on my machine. For implementation, see my GitHub repository\footnote{See \url{https://github.com/peter-i-istvan/bsc-thesis}, under \texttt{tracking/detection\_evaluation.py} for the code, \texttt{p\_curve.csv}, and \texttt{r\_curve.csv} for the curves in }, where the curves are also available, saved in CSV format. 
+Running this took 1 hour and 8 minutes on my machine. For implementation, see my GitHub repository\footnote{See \url{https://github.com/peter-i-istvan/bsc-thesis}, under \texttt{tracking/detection\_evaluation.py} for the code, \texttt{p\_curve.csv}, and \texttt{r\_curve.csv} for the curves in }, where the curves are also available, saved in CSV format.
 
-\textbf{insert plots when ready}
+Finally, I wrote a small script that plots this\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/plot\_pr.py}. The PNG plots are also there under the root directory.} for each model. The results can be seen in~\ref{fig:pr_detr} and~\ref{fig:pr_yolo}. 
+
+\begin{figure}[h]
+    \captionsetup{width=\textwidth}
+    \includegraphics[width=0.49\textwidth]{figures/detr-resnet-50.png}
+    \includegraphics[width=0.49\textwidth]{figures/detr-resnet-101.png}
+    \caption{The PR curves of the two DETR models.}
+    \label{fig:pr_detr}
+\end{figure}
+
+\begin{figure}[h]
+    \captionsetup{width=\textwidth}
+    \includegraphics[width=0.49\textwidth]{figures/yolov5n.png}
+    \includegraphics[width=0.49\textwidth]{figures/yolov5s.png} \\
+    \includegraphics[width=0.49\textwidth]{figures/yolov5m.png}
+    \includegraphics[width=0.49\textwidth]{figures/yolov5l.png} \\
+    \includegraphics[width=0.49\textwidth]{figures/yolov5x.png}
+    \caption{The PR curves of the five YOLO models.}
+    \label{fig:pr_yolo}
+\end{figure}
 
 \subsection{Running SORT}
 
@@ -278,6 +293,18 @@ During the consecutive runnings of the script, I recorded the elapsed time and F
 \end{table}
 
 \subsection{Calculating tracking performance}
+
+After the tracking outputs were ready, I ran the tracking evaluation. The main goal was to calculate MOTA scores, average MOTA for every model-confidence threshold pair, across all sequences, to be precise. In the end though, I ended up calculating more metrics, to see a broader picture about the tracker performance.
+
+For this, I used the \verb|motmetrics| library, similarly to the detection evaluation. I processed each sequence with an accumlator objects, computing several summary metrics at the end. For every model, confidence threshold, sequence trio, I had a summary in the form of a Pandas dataframe, holding all the same metrics. I gathered all these, then aggregated across the sequences, recieving aggregate scores for each model and confidence threshold.
+
+The scores I queried in for each sequence were the \textit{MOTA}, \textit{MOTP}, \textit{number of identity switches}, the number of \textit{mostly tracked trajectories} (80\% or more of it was tracked), \textit{mostly lost trajectories} (20\% or less of it was tracked), and the \textit{number of unique objects}. I aggregated the MOTA and MOTP by averaging (also saving minimum and maximum MOTA score), the rest by calculating the sum of their values.
+
+\textbf{insert tables when ready}
+
+\textbf{insert MOTA - conf threshold plots when ready}.
+
+Running this took \textbf{TIME}. For implementation, see the GitHub repository\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/tracking\_evaluation.py}}
 
 \subsection{Calculting benchmark scores}
 
