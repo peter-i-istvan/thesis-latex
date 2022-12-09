@@ -2,7 +2,7 @@
 
 As the final aim of my thesis, I am going to inspect the performance of the chosen object detectors on a higher-order problem (meaning that detection is only the first conceptual layer of the solution), namely multiple object tracking (MOT). First I am going to review the problem itself, and the common metrics used to measure its performance. 
 
-After this, I will elaborate on the object tracking method I chose as the basis, showing how it incorporates the aforementioned detectors, and the way the performance of the latter is expected to influence tracking performance.
+After this, I will elaborate on the object tracker implementation I chose as the basis, showing how it incorporates the aforementioned detectors, and the way the performance of the latter is expected to influence tracking performance.
 
 Finally, I will describe my experimental setup aiming to measure tracker performance based on the detector type supplied to it. Several parts of the evaluation environment were implemented by me, so I will detail my design chices whenever such a part comes into focus.
 
@@ -30,24 +30,61 @@ After inspecting some research literature in MOT, I saw that the most popular me
 
 The CLEAR MOT paper provides not only the metrics themselves, but also explains the specifics of the evaluation process. After a literature and research review, it starts by defining the characteristics of a desirable tracker: `It should at all points in time find the correct number of objects present; and estimate the position of each object as precisely as possible (note that properties such as the contour, orientation, or speed of objects are not explicitly considered here). It should also keep consistent track of each object over time: each object should be assigned a unique track ID which stays constant throughout the sequence (even after temporary occlusion, etc.)'.
 
-The proposed evaluation procedure should, in short, find best one-to-oneassignment between hypotheses and ground truth objects (usually in the form of bounding boxes with object identifier, using some distance metric for their dissimilarity) at every time step, and assess how well it went. One kind of problem that can arise is that the hypothesis has no reasonably close match (denoted as some distance threshold T). Here, we talk about a \textit{false negative} (FN). Another problem can be that after assigment, predictions were left with no ground truth match. This can be because they are further away from any ground truth objects than the treshold, or simply there are more predictions than ground truth.
+The proposed evaluation procedure should, in short, find best one-to-one assignment between object hypotheses (system predictions) and ground truth objects (usually in the form of bounding boxes with object identifier, using some distance metric for their dissimilarity) at every time step, and assess how well it went. First, I mention that I will use terms `object', `track', `prediction', `hypothesis' etc. interchangeably, but will usually use the term `track' when I consider its predicted identity, not only its location.
 
-A problem is when ground truth object A was previously assigned to predicted trajectory of X, and in the next frame, the predicted box of Y, another object, is closer to A than the next position of X, should we 
+One kind of problem that can arise during assignment is that the hypothesis has no reasonably close match (denoted as some distance threshold T). Here, we talk about a \textit{false negative} (FN). Another problem can be that after assigment, predictions were left with no ground truth match. This can be because they are further away from any ground truth objects than the treshold, or simply there are more predictions than ground truth. Here we talk about a \textit{false positive} (FP). Until now, the metrics are the same as in the case of object detection.
 
-\begin{itemize}
-    \item identity swap (IDS)
-\end{itemize}
+One difference in evaluating though is the case of ambiguity: what happens if more predicted objects are within distance threshold? In the case of detection, usually the closest one is assigned, and if two ground truths share a single `closest' hypothesis, the Hungarian algorithm for bipartite graph matching solves this problem in a globally optimal way. In the case of tracking however, one must account for the identities of the objects.
 
-I got to get familiar with the paper after being referenced by a well-known tracker benchmark, the MOT15~\cite{MOT15}.
+When ground truth object A was previously assigned to predicted object X, then in the next step, two or more predicted objects are within ditance threshold to A. In the simplest case, if neither are X, the track is considered lost (or maybe prediction for X has wandered too far), another assigned track with a different identity will take its place through an identity swap, and it is a \textit{mismatch}. Otherwise if X is among them, and it is the closest one, then again, the assignment is simple. But when X is not the closest, we still assign it to A over the closest prediction, because we want to keep track identity for as long as possible, and it is the best approach to cases when the trajectories of the two objects overlap: if the prediction of one gets slightly closer to the other's ground truth, assigning by closest match would make us record an identity swap between the two, even though in reality both predictions were fairly good, staying within threshold.
 
-% When it comes to define metrics to measure a tracking solution's performance, there does not seem to be one trivial, immediately obvious score that can quantify the overall adequacy. When chosing metrics, I had to look for what the most well-known and respected benchmarks measured.
+Let $GT_t$ denote the number of ground truth boxes in a time step $t$, $FP_t$ the number of false positives, $FN_t$ the number of false negatives, while let $IDS_t$  denote the number of mismatches ($IDS$ is for identity switch, a notation used for the same concept in other publications, like~\cite{MOT15}). Then the first metric proposed by the paper is:
 
-% One of, if not the most popular multiple object tracking benchmark is the MOTChallenge\footnote{\url{https://motchallenge.net/}}, introduced in~\cite{MOT15}.
+\[ MOTA = 1 - \frac{\sum_{t}{FP_t} + \sum_{t}{FN_t} + \sum_{t}{IDS_t}}{\sum_{t}{GT_t}} \]
 
-% TODO: The MOT15 data format.
+The other one is $MOTP$, defined as \textit{the average dissimilarity between all hypothesis to ground truth assignments, across all time steps}. In this thesis, I will use the Intersection over Union (IoU) metric for box dissimilarity, or `box distance'.
 
-\section{SORT [WORK IN PROGRESS]}
+\section{SORT}
 
+Simple Online Realtime Tracker (SORT) was introduced in~\cite{Bewley_2016}, it is a simple yet very popular tracker implementation, presented as performing on par with state-of-the art solutions at the time. It is a detection-based tracker, and uses only positional information for the detection-to-track assignment, appearance features are ignored.
+
+The tracking method is the following: at each step, the system keeps track of the objects already being tracked, as well as their last known position and velocity. The velocity is a computed value that comes from the difference in time of previous positions, but it is also smoothed by a Kalman filter. It predicts the expected next position and velocity based on the Kalman tracker's state, and when detections arrive, it makes a minimum-distance assignment between expected positions of the tracks and detections, using the Hungarian algorithm, and update the state of the tracks with the assigned detections.
+
+If a previous track has no detection assigned, we keep predicting its possible next states to the extent of a parameter called \textit{maximum age}, then if a viable assigment arises, we keep tracking and reset \textit{maximum age}. If it is not reassigned by the time \textit{maximum age} reaches 0, the track is discarded.
+
+If a prediction has no previous track assigned, we initialize it as a potential track. A given number (\textit{minimum hits}) of successive detection assigments to this potential track are needed to establish it as an actual track.
+
+At the end, the Kalman filter self-corrects with the actual positions based on the assigment. In summary, the role of the Kalman filter is to provide possibility to infer hidden state (velocity, needed for prediction) from observable state (positions), provided a linear relationship between the two (\begin{math}\textbf{v}(t) = \textbf{s}(t)dt\end{math}), acting as a linear estimator for the trajectory.
+
+The introduction to the paper states that the problem of occlusion (or brief loss of detection) is ignored for simplicity, but in the short term, it can be remedied by setting \textit{maximum age} properly.
+
+For this project, I am using the official implementation\footnote{\url{https://github.com/abewley/sort}}.
+
+\section{A popular benchmark}
+
+In this section I will refer to one of the most popular multiple object tracking benchmarks, the MOT15, as well as its later versions, the MOT16, MOT17 and MOT20. It was introduced in~\cite{MOT15}, allong with the MOTChallenge\footnote{\url{https://motchallenge.net/}}. The metrics used in evaluation are the CLEAR MOT metrics. \cite{MOT15} defines a data format for saving detection and tracking results. The data should be stored in text files, with each line looking like:
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c c c c c c c c c c}
+        \textit{frame} & \textit{ID} & \textit{x} & \textit{y} & \textit{w} & \textit{h} & \textit{conf.} & \textit{NA} & \textit{NA} & \textit{NA} \\
+        1, & -1, & 794.2, & 47.5, & 71.2, & 174.8, & 67.5, & -1, & -1, & -1 \\
+    \end{tabular}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c c c c c c c c c c}
+        \textit{frame} & \textit{ID} & \textit{x} & \textit{y} & \textit{w} & \textit{h} & \textit{conf.} & \textit{NA} & \textit{NA} & \textit{NA} \\
+        1, & 3, & 875.4, & 39.9, & 25.3, & 35.0, & 0, & -1, & -1, & -1 \\
+    \end{tabular}
+\end{table}
+
+The first one is from a detection file, the second one from a tracking annotation file. Here, frame is the number of the frame, ID is the identifier of th object, -1 in detection files. The next four entries are the box coordinates specifying the top left corner of the box, its width and height, the next is detection confidence (irrelevant for tracker annotation files).
+
+The last 3 entries are not used in the output of either the detector or the tracker, but in the tracking ground truth files that the MOTChallenge uses to evaluate submitted results. They indicate certain objects that should not be tracked, or if tracked, should be ignored at evaluation. These objects include occluders, the reflections of the objects (which can be, but are not required to be found by the tracker, and the result should not be penalized either way).
+
+I refered to this format because the official SORT implementation uses this as both input and output format, so it will be relevant information at the data processing steps.
 
 \section{Choosing the data}
 
@@ -88,7 +125,7 @@ Initially I inspected the MAT files' inner structure (see figure~\ref{fig:octave
 \end{figure}
 
 
-\section{Benchmark}
+\section{Used benchmark}
 
 The dataset and the benchmark is described in~\cite{CVIU_UA-DETRAC}. The article also proposes an evaluation protocol for multi-object tracking. A key point is the joint analysis of detection and tracking performance, analysing the effects of the chosen model's precision/recall values (and the underlying confidence threshold setting that influences both) in relation with the tracking performance, as reflected by the MOTA and MOTP score. These relationships are visualized on the PR-MOTA and PR-MOTP curves (See figure~\ref{fig:pr-mota}).
 
