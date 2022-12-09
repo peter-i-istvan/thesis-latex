@@ -1,8 +1,10 @@
 \chapter{Higher Order Applications: Multiple Object Tracking}
 
-As the final aim of my thesis, I am going to inspect the performance of the chosen object detectors on a higher-order problem, namely multiple object tracking. First I am going to review the problem itself, and the common metrics used to measure its performance. 
+As the final aim of my thesis, I am going to inspect the performance of the chosen object detectors on a higher-order problem (meaning that detection is only the first conceptual layer of the solution), namely multiple object tracking (MOT). First I am going to review the problem itself, and the common metrics used to measure its performance. 
 
 After this, I will elaborate on the object tracking method I chose as the basis, showing how it incorporates the aforementioned detectors, and the way the performance of the latter is expected to influence tracking performance.
+
+Finally, I will describe my experimental setup aiming to measure tracker performance based on the detector type supplied to it. Several parts of the evaluation environment were implemented by me, so I will detail my design chices whenever such a part comes into focus.
 
 \section{The problem and possible approaches}
 
@@ -20,15 +22,31 @@ The introduction above focuses on paradigms and aspects mostly relevant for my t
 
 Finally, it is worth mentioning that the most common multi-object tracking targets are pedestrians, faces and vehicles, and thus most popular MOT datasets consist of these. In this thesis, I am going to tackle tracking vehicles in road traffic footages.
 
-\section{Metrics [WORK IN PROGRESS]}
+\section{Metrics}
 
-When it comes to define metrics to measure a tracking solution's performance, there does not seem to be one trivial, immediately obvious score that can quantify the overall adequacy. When chosing metrics, I had to look for what the most well-known and respected benchmarks measured.
+When thinking about assessing the performance of multiple object tracking applications, there is no one singular metric that comes to mind, but there are several ways in which a tracker can be wrong (at least in as many ways as an object detector). Starting from these errors, categorizing and counting them, and then inspecting their relation to the total of ground truth detections can give the right picture.
 
-One of, if not the most popular multiple object tracking benchmark is the MOTChallenge\footnote{\url{https://motchallenge.net/}}, introduced in~\cite{MOT15}.
+After inspecting some research literature in MOT, I saw that the most popular metrics coming up again and again were the CLEAR MOT metrics, or at least some of them. They were introduced in~\cite{Bernardin2008}, back in 2008, when generally-agreed upon metrics were not estabilished in the field. It proposes the MOTA and MOTP metrics as a way to quantify identity tracking and localization performance.
 
-TODO: The MOT15 data format.
+The CLEAR MOT paper provides not only the metrics themselves, but also explains the specifics of the evaluation process. After a literature and research review, it starts by defining the characteristics of a desirable tracker: `It should at all points in time find the correct number of objects present; and estimate the position of each object as precisely as possible (note that properties such as the contour, orientation, or speed of objects are not explicitly considered here). It should also keep consistent track of each object over time: each object should be assigned a unique track ID which stays constant throughout the sequence (even after temporary occlusion, etc.)'.
 
-\section{SORT, theoretical background [WORK IN PROGRESS]}
+The proposed evaluation procedure should, in short, find best one-to-oneassignment between hypotheses and ground truth objects (usually in the form of bounding boxes with object identifier, using some distance metric for their dissimilarity) at every time step, and assess how well it went. One kind of problem that can arise is that the hypothesis has no reasonably close match (denoted as some distance threshold T). Here, we talk about a \textit{false negative} (FN). Another problem can be that after assigment, predictions were left with no ground truth match. This can be because they are further away from any ground truth objects than the treshold, or simply there are more predictions than ground truth.
+
+A problem is when ground truth object A was previously assigned to predicted trajectory of X, and in the next frame, the predicted box of Y, another object, is closer to A than the next position of X, should we 
+
+\begin{itemize}
+    \item identity swap (IDS)
+\end{itemize}
+
+I got to get familiar with the paper after being referenced by a well-known tracker benchmark, the MOT15~\cite{MOT15}.
+
+% When it comes to define metrics to measure a tracking solution's performance, there does not seem to be one trivial, immediately obvious score that can quantify the overall adequacy. When chosing metrics, I had to look for what the most well-known and respected benchmarks measured.
+
+% One of, if not the most popular multiple object tracking benchmark is the MOTChallenge\footnote{\url{https://motchallenge.net/}}, introduced in~\cite{MOT15}.
+
+% TODO: The MOT15 data format.
+
+\section{SORT [WORK IN PROGRESS]}
 
 
 \section{Choosing the data}
@@ -238,26 +256,7 @@ Finally, I save them as CSV files. The result can be seen in tables~\ref{tab:p_c
 
 Running this took 1 hour and 8 minutes on my machine. For implementation, see my GitHub repository\footnote{See \url{https://github.com/peter-i-istvan/bsc-thesis}, under \texttt{tracking/detection\_evaluation.py} for the code, \texttt{p\_curve.csv}, and \texttt{r\_curve.csv} for the curves in }, where the curves are also available, saved in CSV format.
 
-Finally, I wrote a small script that plots this\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/plot\_pr.py}. The PNG plots are also there under the root directory.} for each model. The results can be seen in~\ref{fig:pr_detr} and~\ref{fig:pr_yolo}. 
-
-\begin{figure}[h]
-    \captionsetup{width=\textwidth}
-    \includegraphics[width=0.49\textwidth]{figures/detr-resnet-50.png}
-    \includegraphics[width=0.49\textwidth]{figures/detr-resnet-101.png}
-    \caption{The PR curves of the two DETR models.}
-    \label{fig:pr_detr}
-\end{figure}
-
-\begin{figure}[h]
-    \captionsetup{width=\textwidth}
-    \includegraphics[width=0.49\textwidth]{figures/yolov5n.png}
-    \includegraphics[width=0.49\textwidth]{figures/yolov5s.png} \\
-    \includegraphics[width=0.49\textwidth]{figures/yolov5m.png}
-    \includegraphics[width=0.49\textwidth]{figures/yolov5l.png} \\
-    \includegraphics[width=0.49\textwidth]{figures/yolov5x.png}
-    \caption{The PR curves of the five YOLO models.}
-    \label{fig:pr_yolo}
-\end{figure}
+Finally, I wrote a small script that plots precision-recall curves\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/plot\_pr.py}. The PNG plots are also there under the root directory.} for each model. The results can be seen in figures~\ref{fig:pr_detr} and~\ref{fig:pr_yolo} in the appendix.
 
 \subsection{Running SORT}
 
@@ -294,52 +293,71 @@ During the consecutive runnings of the script, I recorded the elapsed time and F
 
 \subsection{Calculating tracking performance}
 
-After the tracking outputs were ready, I ran the tracking evaluation. The main goal was to calculate MOTA scores, average MOTA for every model-confidence threshold pair, across all sequences, to be precise. In the end though, I ended up calculating more metrics, to see a broader picture about the tracker performance.
+After the tracking outputs were ready, I ran the tracking evaluation. The main goal was to calculate MOTA scores, average MOTA for every model-confidence threshold pair, across all sequences. Eventually I ended up calculating more metrics, to see a broader picture about the tracker performance.
 
 For this, I used the \verb|motmetrics| library, similarly to the detection evaluation. I processed each sequence with an accumlator objects, computing several summary metrics at the end. For every model, confidence threshold, sequence trio, I had a summary in the form of a Pandas dataframe, holding all the same metrics. I gathered all these, then aggregated across the sequences, recieving aggregate scores for each model and confidence threshold.
 
-The scores I queried in for each sequence were the \textit{MOTA}, \textit{MOTP}, \textit{number of identity switches}, the number of \textit{mostly tracked trajectories} (80\% or more of it was tracked), \textit{mostly lost trajectories} (20\% or less of it was tracked), and the \textit{number of unique objects}. I aggregated the MOTA and MOTP by averaging (also saving minimum and maximum MOTA score), the rest by calculating the sum of their values.
+The scores I queried in for each sequence were the \textit{MOTA}, \textit{MOTP}, number of \textit{identity switches}, the number of \textit{mostly tracked trajectories} (80\% or more of it was tracked), \textit{mostly lost trajectories} (20\% or less of it was tracked), and the number of \textit{unique objects}. I aggregated the MOTA and MOTP by averaging (also saving minimum and maximum MOTA score), the rest by calculating the sum of their values.
 
-\textbf{insert tables when ready}
+It is important to mention that I sticked to the original definition of MOTP, introduced in~\cite{Bernardin2008}, meausres average IoU dissimilarity between true positive predicted trajectories and ground truth, and a smaller value is preferable. In some publications, even in~\cite{Bewley_2016}, the value claimed to be MOTP is actually $1-MOTP$, scaled to percentages, so that higher value is better.
 
-\textbf{insert MOTA - conf threshold plots when ready}.
+Running this took 1 hour and 10 minutes. For implementation, see the GitHub repository\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/tracking\_evaluation.py}. The results in CSV format are also available from the root directory of the repository, as \texttt{MODELNAME\_mota.csv}}. Results can be seen in tables~\ref{tab:mota_yn},~\ref{tab:mota_ys},~\ref{tab:mota_ym},~\ref{tab:mota_yl},~\ref{tab:mota_yx},~\ref{tab:mota_detr50},~\ref{tab:mota_detr101} in the appendix. A plot of the average and maximum MOTA across sequences, for each detector category can be seen in figures~\ref{fig:avg-mota} and~\ref{fig:max-mota}.
 
-Running this took \textbf{TIME}. For implementation, see the GitHub repository\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/tracking\_evaluation.py}}
+Unfortunately, the general overall results across all thresholds were not favorable, with the YOLOv5 medium and large versions reaching best tracking results for confidence thresholds around 70-80\%. In terms of average MOTA across all sequences, they both reached 33-35\% at 80\% confidence threshold, while their maximum MOTA reached in any sequence was and 80-81\% at 70\% confidence threshold.
+
+For the DETR models, MOTA scores underperformed their YOLO counterparts by not reaching positive average scores, but reaching peak average MOTA at 90\% confidence threshold. Their best peroformances on any sequence was 69-74\% MOTA at 90\% confidence threshold.
+
+\begin{figure}[h]
+    \includegraphics[width=0.49\textwidth]{figures/yolo_mota.png}
+    \includegraphics[width=0.49\textwidth]{figures/detr_mota.png}
+    \caption{Average MOTA scores for each model.}
+    \label{fig:avg-mota}
+\end{figure}
+
+\begin{figure}[h]
+    \includegraphics[width=0.49\textwidth]{figures/yolo_max_mota.png}
+    \includegraphics[width=0.49\textwidth]{figures/detr_max_mota.png}
+    \caption{Maximum MOTA scores for each model.}
+    \label{fig:max-mota}
+\end{figure}
 
 \subsection{Calculting benchmark scores}
 
+Finally, I calculated the PR-MOTA score for each detector by joining the previous results along confidence thresholds, using trapezoidal rule approximation to calculate the integral:
+
+\[\int_{\mathcal{C}}{MOTA(\textbf{s})d\textbf{s}} \approx \sum_{t = 2}^{10}{|C_tC_{t-1}|}\frac{MOTA(C_{t-1}) + MOTA(C_t)}{2} \]
+
+where $C_1$, $C_2$, ..., $C_{10}$ are subsequent points on the $\mathcal{C}$ precision-recall curve defined by confidence thresholds between $0$ and $1$ with increments of $0.1$, while $|C_tC_{t-1}|$ denotes the distance between the two points. In practice, for the $1.0$ threshold the detectors supplied no output, so I defined their precision as $1$ (no bad hits) the recall as $0$ (found no true positive), and the $MOTA$ as $0$, in the spirit of the definition of these metrics.
+
+The code for this step can be found, as usual, in the thesis' repository\footnote{\url{https://github.com/peter-i-istvan/bsc-thesis} under \texttt{tracking/calculte\_pr\_mota.py}, and also \texttt{pr\_mota.csv} for CSV results.}. The results can be seen in table~\ref{tab:pr-mota}. They can be considered relatively poor, and indicate that in the bigger part of the $[0;1]$ confidence interval, average MOTA scores are negative. This should be no suprise, because usually one does not trust the detections with confidence below 50\% (I found this to be true empirically, while experimenting with `off-the-shelf' pretrained models like these). The DETR underperforms the YOLO on this metric by a relatively large margin.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|c|c|}
+        \hline
+        & D101 & D50 & YL& YM & YN & YS & YX \\
+        \hline
+        PR-MOTA & -1.33 & -1.51 & -0.42 & -0.37 & -0.19 & -0.33 & -0.46 \\
+        \hline
+    \end{tabular}
+    \caption{PR-MOTA results.}
+\label{tab:pr-mota}
+\end{table}
+
+The best among the DETR is the one with the ResNet101 backbone. This is not surprising, as the ResNet101 is the larger backbone, which usually means richer feature data to work with.  
+
+Surprisingly, among the YOLO, the nano version had the best score. This was unexpected beacuse overall, the large and medium versions reached the highest scores. It can be somewhat explained looking at~\ref{fig:avg-mota}, where the nano version seems to have the highest signed area under the curve, and it has better performance on low confidence thresholds, but this only shows that the measurement is heavily influenced by how bad the tracking was at lower confidence. In production applications, one would chose a relatively high confidence threshold to start with, so the PR-MOTA score fails to predict future performance in such cases, as here the performance metrics on reasonable confidence thresholds are outweighted during averaging.
+
+
+
 \section{Conclusion}
 
-% \subsection{Evaluation}
+When viewing the final results by my chosen metric, the PR-MOTA score seems poor across all detectors. However, I concluded that, in this case, it is a flaw of the metric itself, which fails to predict usefulness in real life scenarios. As I observed, all the detectors I have tried give useless predictions under the confidence threshold of 50-60\% from the perspective of the SORT tracker. The measure of uselessness is almost irrelevant, but this difference is what caused the YOLOv5 nano to reach best score.
 
-% The tracking evaluation toolkit on the official DETRAC website is not available\footnote{\url{https://detrac-db.rit.albany.edu/Tracking}, under DETRAC-toolkit (Windows beta)}, because the login feature does not work. Thus, I had to write my own implementation for the evaluation based on the CLEAR MOT metrics~\cite{Bernardin2008}.
+The real best performing object detectors were the YOLOv5 medium and large models, reaching about 35\% average MOTA on reasonable, 70-80\% confidence thresholds (in addition, the MOTA results obtained here show high variance, because even considering the average of 35\%, on some sequences it varies from -90\% to +80\% - see appendix). This is actually on par with SORT performance as first published in 2016~\cite{Bewley_2016} across various kinds of datasets, but considering the time passed since the publication, it would seem that the apparent improvement in detector quality in the meantime (from 2016 to 2020, publication date of the inspected models) has not brought great improvement in tracking performance. However, I suspect that this more related to the inspected detectors, and the way I evaluated them, than to the usefullness of SORT.
 
+Both detectors were pretrained on the COCO 2017 dataset, a large and rich database of annotated images and numerous object classes, on a long and resource-hevy training regimen, the kind of which I could not replicate. Even though I only used three vehicle categories, the models themselves are capable of recognising much more, and during training the goal is to find all classes, and in all non-iconic poses too. Compared with the object feature distribution of the UA-DETRAC, COCO is richer both in number of object classes and in the context of the cars (the UA-DETRAC contains only vehicles engaged in road traffic, and from fixed camera angles). This generality of the COCO-trained models might hurt specific performance on UA-DETRAC, this is why fine-tuning on similar datasets, or even the vehicle subset of COCO would have helped. In this regard, considering the smaller visual diversity of UA-DETRAC, models from 2016 trained on it specifically can indeed perform on par with models from four years later, trained on COCO, even though the former models would score worse when trained on COCO, because of the inherent inferiority.
 
+Regardless of the above, from the perspective of the original goal, the measurement provided insightful results in comparing a specific convolutional and and a specific Transformer-based object detector that were introduced roughly at the same time. Measurements from all aspects show that the COCO-trained YOLOv5 models outperform the COCO-trained DETR by a large margin when used in multiple vehicle tracking scenarios. It outperforms not only in quality, but in speed, as the inference and tracking times show that all versions of YOLOv5 are capable of real-time detection and tracking (when evaluated on my system), defined as 30 FPS or above, while the DETR versions are not, they are on average 3 to 6 times slower.
 
-% \subsection{Running the detections}
-
-% For the detectors, I have chosen the Detection Transformer (DETR) model as a representative Transformer-based architecture, with two variants, containing the ResNet50 and the ResNet101 backbones, pre-trained on the COCO 2017 dataset.
-
-% On the Fully Convolutional Network (FCN) side, I have chosen a rendition of the You Only Look Once (YOLO) architecture that came out at roughly the same time as the DETR: the YOLOv5. The official repository of the YOLOv5 project\footnote{\url{https://github.com/ultralytics/yolov5}} contains five pre-trained variants: the YOLOv5n (nano), YOLOv5s (small), YOLOv5m (medium), YOLOv5l (large) and YOLOv5x (extra large), all being trained on the COCO 2017 dataset.
-
-% Before running the SORT tracker, I had to prepare the detection results for all sequences in a specific format.
-
-
-
-% \subsection{Running the tracker}
-
-% \begin{figure}[h]
-    % \captionsetup{width=\textwidth}
-    % \includegraphics[width=\textwidth]{}
-    % \caption{...}
-    % \label{fig:dunno}
-% \end{figure}
-
-% \subsection{Tracking visualisation}
-
-
-% \subsection{Rest}
-
-% Usually, a baseline for detection performance in MOT is the R-CNN architecture and its variants.
-
-% For the MOT task, I have chosen the SORT architecture, introduced in~\cite{Bewley_2016}. Altough not the most recent, it is the architecture I have examined in my project laboratory, and has the analytical advantage of solely relying on detection performance, as opposed to method like DeepSORT that are influenced by the association method as well. It can be considered a reasonable baseline methood, relying on first-order velocity estimation and smoothing measurement errors based on the Kalman Filter.  
+This concludes my inquiry, but it is needed to mention that from 2020 until the present, Transformer-based visual models, and object detectors specifically have seen great improvement, with introduction of new models like the Swin Transformer, Deformable DETR, Group DETR, GRiT, DINO etc. When inspecting leaderboards on Papers with Code\footnote{A popular online collection of machine learning publications, links to official codebases and benchmark results for comparison. See \url{https://paperswithcode.com/sota/object-detection-on-coco}}, it seems that evaluated on the COCO test set, the best of these currently outperform the YOLO series, but most convolutional object detectors as well. The only category where YOLO still has an edge is quality to speed ratio, as for real-time object detection, YOLOv7 is currently the leading model, outperforming fast visual Transformers like Swin.\footnote{\url{https://paperswithcode.com/sota/real-time-object-detection-on-coco}}.
